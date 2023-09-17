@@ -6,6 +6,7 @@ const FAASM_VENDOR_FOLDER: &str = "vendor/faasm";
 const FAASM_RELEASE_BASE_URL: &str = "https://github.com/faasm/faasm/releases/download/v";
 const FAASM_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[allow(dead_code)]
 enum FaasmRelease {
     RuntimeRoot,
     Sysroot,
@@ -46,7 +47,7 @@ impl FaasmRelease {
         let out_path = self.file_path();
         if !out_path.exists() {
             // Downloads file
-            let response = reqwest::blocking::get(&self.url())?;
+            let response = reqwest::blocking::get(self.url())?;
 
             // Extacts tar.gz
             let tar = GzDecoder::new(response);
@@ -120,7 +121,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let library_dir = library_path.into_os_string().into_string().unwrap();
 
                 // Generate a wrapper based on the library location
-                let header = generate_header(FAASM_VENDOR_FOLDER, &FaasmRelease::Sysroot.filename())?;
+                let header =
+                    generate_header(FAASM_VENDOR_FOLDER, &FaasmRelease::Sysroot.filename())?;
 
                 (library_dir, header)
             }
