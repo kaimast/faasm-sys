@@ -16,17 +16,17 @@ enum FaasmRelease {
 impl FaasmRelease {
     fn tar_filename(&self) -> String {
         match self {
-            Self::RuntimeRoot => format!("faasm-runtime-root-{}.tar.gz", FAASM_VERSION),
-            Self::Sysroot => format!("faasm-sysroot-{}.tar.gz", FAASM_VERSION),
-            Self::Toolchain => format!("faasm-toolchain-{}.tar.gz", FAASM_VERSION),
+            Self::RuntimeRoot => format!("faasm-runtime-root-{FAASM_VERSION}.tar.gz"),
+            Self::Sysroot => format!("faasm-sysroot-{FAASM_VERSION}.tar.gz"),
+            Self::Toolchain => format!("faasm-toolchain-{FAASM_VERSION}.tar.gz"),
         }
     }
 
     fn filename(&self) -> String {
         match self {
-            Self::RuntimeRoot => format!("runtime-root-{}", FAASM_VERSION),
-            Self::Sysroot => format!("sysroot-{}", FAASM_VERSION),
-            Self::Toolchain => format!("toolchain-{}", FAASM_VERSION),
+            Self::RuntimeRoot => format!("runtime-root-{FAASM_VERSION}"),
+            Self::Sysroot => format!("sysroot-{FAASM_VERSION}"),
+            Self::Toolchain => format!("toolchain-{FAASM_VERSION}"),
         }
     }
 
@@ -67,10 +67,9 @@ fn generate_header(root_dir: &str, sysroot_dir: &str) -> io::Result<String> {
         Ok(mut header_handler) => {
             let header_content = format!(
                 "\
-                #include \"{}/llvm-sysroot/include/faasm/host_interface.h\"\n\
-                #include \"{}/llvm-sysroot/include/faasm/rfaasm.h\"\
-            ",
-                sysroot_dir, sysroot_dir
+                #include \"{sysroot_dir}/llvm-sysroot/include/faasm/host_interface.h\"\n\
+                #include \"{sysroot_dir}/llvm-sysroot/include/faasm/rfaasm.h\"\
+            "
             );
             header_handler.write_all(&header_content.into_bytes())?;
             Ok(header_file)
@@ -108,7 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (library_path, header) = match var("FAASM_SYS_DEV") {
             Ok(_) => (
                 "/usr/local/faasm/llvm-sysroot/lib".to_string(),
-                format!("{}/wrapper.h", FAASM_VENDOR_FOLDER),
+                format!("{FAASM_VENDOR_FOLDER}/wrapper.h"),
             ),
             Err(_) => {
                 // Download the Sysroot if it doesn't exists
@@ -129,13 +128,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // Rerun if the wrapper is changed (more relevant for dev mode)
-        println!("cargo:rerun-if-changed={}", header);
+        println!("cargo:rerun-if-changed={header}");
 
         // TODO - this only copies the manually generated bindings
         generate_bindings(&header, &binding_file)?;
 
         // Link libs from Faasm Sysroot
-        println!("cargo:rustc-link-search={}", library_path);
+        println!("cargo:rustc-link-search={library_path}");
 
         // Add libraries
         println!("cargo:rustc-link-lib=static=faasm");
