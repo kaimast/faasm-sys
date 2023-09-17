@@ -18,7 +18,7 @@ travis-ci = { repository = "mfournial/faasm-sys" }
 
 [build-dependencies]
 flate2 = "1.0"
-reqwest = { version = "0.10", features = ["blocking", "default-tls"], default-features = false }
+reqwest = { version = "0.11", features = ["blocking", "default-tls"], default-features = false }
 tar = "0.4"
 
 [package.metadata.docs.rs]
