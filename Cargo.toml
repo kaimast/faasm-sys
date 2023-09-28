@@ -4,15 +4,17 @@ description = "Rust bindings for Faasm."
 authors = ["Mayeul Fournial <mfournial@outlook.com>"]
 readme = "README.md"
 repository = "https://github.com/mfournial/faasm-sys"
-
 version = "0.0.12" # in sync with Faasm
 build = "build.rs"
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 
 [badges]
 maintenance = { status = "experimental" }
 travis-ci = { repository = "mfournial/faasm-sys" }
+
+[[example]]
+name = "hello_world"
 
 [dependencies]
 

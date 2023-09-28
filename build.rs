@@ -1,5 +1,7 @@
 use flate2::read::GzDecoder;
-use std::{env::var, fs, io, io::prelude::*, io::ErrorKind::AlreadyExists, path::PathBuf};
+use std::{
+    env::var, fs, io, io::prelude::*, io::ErrorKind::AlreadyExists, path::Path, path::PathBuf,
+};
 use tar::Archive;
 
 const FAASM_VENDOR_FOLDER: &str = "vendor/faasm";
@@ -36,9 +38,7 @@ impl FaasmRelease {
 
     fn url(&self) -> String {
         format!(
-            "{}{}/{}",
-            FAASM_RELEASE_BASE_URL,
-            FAASM_VERSION,
+            "{FAASM_RELEASE_BASE_URL}{FAASM_VERSION}/{}",
             self.tar_filename()
         )
     }
@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let binding_file = PathBuf::from(var("OUT_DIR").unwrap()).join("bindings.rs");
 
     let target = var("TARGET").unwrap();
-    if target == "wasm32-unknown-unknown" {
+    if target.starts_with("wasm32") {
         // Determine if we want the dev environment or a simple installation
         let (library_path, header) = match var("FAASM_SYS_DEV") {
             Ok(_) => (
@@ -134,7 +134,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         generate_bindings(&header, &binding_file)?;
 
         // Link libs from Faasm Sysroot
-        println!("cargo:rustc-link-search={library_path}");
+        //println!("cargo:rustc-link-search={library_path}");
+
+        let dir = var("CARGO_MANIFEST_DIR").unwrap();
+        println!(
+            "cargo:rustc-link-search=native={}",
+            Path::new(&dir).display()
+        );
 
         // Add libraries
         println!("cargo:rustc-link-lib=static=faasm");
