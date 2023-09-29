@@ -1,0 +1,6 @@
+[build]
+rustflags = [
+    "-C", "link-arg=--export=_faasm_zygote",
+    "-C", "link-arg=--export=__wasm_call_ctors",
+    "-C", "link-arg=--max-memory=4294901760",
+]

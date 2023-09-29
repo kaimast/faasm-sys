@@ -25,3 +25,4 @@ tar = "0.4"
 
 [package.metadata.docs.rs]
 targets = [] # Do not build docs since this is a sys crate
+
