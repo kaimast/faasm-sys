@@ -1,74 +1,18 @@
-use flate2::read::GzDecoder;
-use std::{
-    env::var, fs, io, io::prelude::*, io::ErrorKind::AlreadyExists, path::Path, path::PathBuf,
-};
-use tar::Archive;
+use std::{env::var, fs, io, io::prelude::*, io::ErrorKind::AlreadyExists, path::PathBuf};
 
-const FAASM_VENDOR_FOLDER: &str = "vendor/faasm";
-const FAASM_RELEASE_BASE_URL: &str = "https://github.com/faasm/faasm/releases/download/v";
+const FAASM_VENDOR_FOLDER: &str = "vendor/faasm/";
+const LIBFAASM_PATH: &str = "cpp/libfaasm";
 const FAASM_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[allow(dead_code)]
-enum FaasmRelease {
-    RuntimeRoot,
-    Sysroot,
-    Toolchain,
-}
-
-impl FaasmRelease {
-    fn tar_filename(&self) -> String {
-        match self {
-            Self::RuntimeRoot => format!("faasm-runtime-root-{FAASM_VERSION}.tar.gz"),
-            Self::Sysroot => format!("faasm-sysroot-{FAASM_VERSION}.tar.gz"),
-            Self::Toolchain => format!("faasm-toolchain-{FAASM_VERSION}.tar.gz"),
-        }
-    }
-
-    fn filename(&self) -> String {
-        match self {
-            Self::RuntimeRoot => format!("runtime-root-{FAASM_VERSION}"),
-            Self::Sysroot => format!("sysroot-{FAASM_VERSION}"),
-            Self::Toolchain => format!("toolchain-{FAASM_VERSION}"),
-        }
-    }
-
-    fn file_path(&self) -> PathBuf {
-        PathBuf::from(FAASM_VENDOR_FOLDER).join(self.filename())
-    }
-
-    fn url(&self) -> String {
-        format!(
-            "{FAASM_RELEASE_BASE_URL}{FAASM_VERSION}/{}",
-            self.tar_filename()
-        )
-    }
-
-    fn download_tar(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let out_path = self.file_path();
-        if !out_path.exists() {
-            // Downloads file
-            let response = reqwest::blocking::get(self.url())?;
-
-            // Extacts tar.gz
-            let tar = GzDecoder::new(response);
-            let mut archive = Archive::new(tar);
-            archive.unpack(out_path)?;
-        }
-
-        // We're done
-        Ok(())
-    }
-}
-
 // Generates a wrapper header pointing to the FaasmRelease sysroot
-fn generate_header(root_dir: &str, sysroot_dir: &str) -> io::Result<String> {
-    let header_file = format!("{}/wrapper-{}.h", root_dir, FAASM_VERSION);
+fn generate_header(root_dir: &str) -> io::Result<String> {
+    let header_file = format!("{root_dir}/wrapper-{FAASM_VERSION}.h");
     match fs::File::create(&header_file) {
         Ok(mut header_handler) => {
             let header_content = format!(
                 "\
-                #include \"{sysroot_dir}/llvm-sysroot/include/faasm/host_interface.h\"\n\
-                #include \"{sysroot_dir}/llvm-sysroot/include/faasm/rfaasm.h\"\
+                #include \"{LIBFAASM_PATH}/faasm/host_interface.h\"\n\
+                #include \"{LIBFAASM_PATH}/faasm/faasm.h\"\n\
             "
             );
             header_handler.write_all(&header_content.into_bytes())?;
@@ -98,55 +42,57 @@ fn generate_bindings(_wrapper: &str, output_file: &PathBuf) -> io::Result<()> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let target = var("TARGET").unwrap();
+
+    if !target.starts_with("wasm32") {
+        panic!("Can only build faasm-sys for a WASM target");
+    }
+
     // Location of the binding file that will be included in the library
     let binding_file = PathBuf::from(var("OUT_DIR").unwrap()).join("bindings.rs");
 
-    let target = var("TARGET").unwrap();
-    if target.starts_with("wasm32") {
-        // Determine if we want the dev environment or a simple installation
-        let (library_path, header) = match var("FAASM_SYS_DEV") {
-            Ok(_) => (
-                "/usr/local/faasm/llvm-sysroot/lib".to_string(),
-                format!("{FAASM_VENDOR_FOLDER}/wrapper.h"),
-            ),
-            Err(_) => {
-                // Download the Sysroot if it doesn't exists
-                FaasmRelease::Sysroot.download_tar()?;
-                let library_path = std::env::current_dir()?
-                    .join(FaasmRelease::Sysroot.file_path())
-                    .join("llvm-sysroot/lib");
+    let header = generate_header(FAASM_VENDOR_FOLDER)?;
 
-                // Paths can be invalid UTF-8 but we
-                let library_dir = library_path.into_os_string().into_string().unwrap();
+    // Rerun if the wrapper is changed (more relevant for dev mode)
+    println!("cargo:rerun-if-changed={header}");
 
-                // Generate a wrapper based on the library location
-                let header =
-                    generate_header(FAASM_VENDOR_FOLDER, &FaasmRelease::Sysroot.filename())?;
+    // TODO - this only copies the manually generated bindings
+    generate_bindings(&header, &binding_file)?;
 
-                (library_dir, header)
-            }
-        };
+    let source_files: Vec<_> = vec![
+        "compare.cpp",
+        "core.cpp",
+        "files.cpp",
+        "input.cpp",
+        "print.cpp",
+        "random.cpp",
+        "state.cpp",
+        "time.cpp",
+        "zygote.cpp",
+    ]
+    .into_iter()
+    .map(|f| format!("{LIBFAASM_PATH}/{f}"))
+    .collect();
 
-        // Rerun if the wrapper is changed (more relevant for dev mode)
-        println!("cargo:rerun-if-changed={header}");
+    cc::Build::new()
+        .cpp(true)
+        .cpp_set_stdlib("c++")
+        .std("c++17")
+        .include(LIBFAASM_PATH)
+        .flag("--sysroot=/usr/share/wasi-sysroot")
+        .files(source_files)
+        .compile("faasm");
 
-        // TODO - this only copies the manually generated bindings
-        generate_bindings(&header, &binding_file)?;
+    /* WASM support in CMake seems broken...
 
-        // Link libs from Faasm Sysroot
-        //println!("cargo:rustc-link-search={library_path}");
+    let dst = cmake::Config::new("cpp/libfaasm")
+                .define("CMAKE_HOST_SYSTEM_NAME", "Linux")
+                .define("CMAKE_SYSTEM_NAME", "Wasm")
+                .build();
+    */
 
-        let dir = var("CARGO_MANIFEST_DIR").unwrap();
-        println!(
-            "cargo:rustc-link-search=native={}",
-            Path::new(&dir).display()
-        );
-
-        // Add libraries
-        println!("cargo:rustc-link-lib=static=faasm");
-    } else {
-        unimplemented!("Link native Faasm libraries");
-    }
+    //println!("cargo:rustc-link-search=native={}", dst.display());
+    println!("cargo:rustc-link-lib=static=faasm");
 
     Ok(())
 }
