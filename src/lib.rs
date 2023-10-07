@@ -1,3 +1,5 @@
+#![feature(wasi_ext)]
+
 // include automatically generated bindings from C include files
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
