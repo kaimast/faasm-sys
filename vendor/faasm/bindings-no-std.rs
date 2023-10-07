@@ -5,13 +5,14 @@ type c_uchar = u8;
 type c_long = i32;
 type c_int = i32;
 type c_uint = u32;
+type c_usize = 
 
 extern "C" {
     pub fn __faasm_read_state(
         key: *const c_char,
         buffer: *mut c_uchar,
         bufferLen: c_long,
-    );
+    ) -> c_long;
 }
 extern "C" {
     pub fn __faasm_read_state_ptr(

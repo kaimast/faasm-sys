@@ -11,7 +11,7 @@ extern "C" {
         key: *const ::std::os::raw::c_char,
         buffer: *mut ::std::os::raw::c_uchar,
         bufferLen: ::std::os::raw::c_long,
-    );
+    ) -> ::std::os::raw::c_uint;
 }
 extern "C" {
     pub fn __faasm_read_state_ptr(
