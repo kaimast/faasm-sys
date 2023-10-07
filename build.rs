@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO - this only copies the manually generated bindings
     generate_bindings(&header, &binding_file)?;
 
-    let source_files: Vec<_> = vec![
+/*    let source_files: Vec<_> = vec![
         "compare.cpp",
         "core.cpp",
         "files.cpp",
@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     */
 
     //println!("cargo:rustc-link-search=native={}", dst.display());
-    println!("cargo:rustc-link-lib=static=faasm");
+    println!("cargo:rustc-link-lib=static=faasm");*/
 
     Ok(())
 }
